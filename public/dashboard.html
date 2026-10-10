@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - JobCompass</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+  <div id="nav"></div>
+  <main class="container py-4" id="app"><div class="text-muted">Loading...</div></main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="js/common.js"></script>
+  <script>
+    async function loadDashboard() {
+      const root = document.getElementById('app');
+      try {
+        const d = await api('/dashboard');
+        const countOf = (s) => (d.byStatus.find((x) => x.status === s) || { count: 0 }).count;
+
+        const list = (items, render, empty) => items.length
+          ? '<ul class="list-group list-group-flush">' + items.map((i) => '<li class="list-group-item">' + render(i) + '</li>').join('') + '</ul>'
+          : '<div class="text-muted p-3">' + empty + '</div>';
+
+        root.innerHTML = `
+          <h2 class="page-title mb-3">Welcome, ${esc(currentUser().name || 'there')}</h2>
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3"><div class="stat-card bg-grad-1"><div class="num">${d.total}</div>Total applications</div></div>
+            <div class="col-6 col-md-3"><div class="stat-card bg-grad-2"><div class="num">${countOf('Interview')}</div>In interview stage</div></div>
+            <div class="col-6 col-md-3"><div class="stat-card bg-grad-3"><div class="num">${countOf('Selected')}</div>Selected</div></div>
+            <div class="col-6 col-md-3"><div class="stat-card bg-grad-4"><div class="num">${countOf('Rejected')}</div>Rejected</div></div>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6"><div class="card jc-card h-100"><div class="card-body">
+              <h6 class="text-muted">Applications by status</h6>
+              ${d.total ? '<canvas id="statusChart" height="200"></canvas>' : '<div class="text-muted py-4">Add an application to see the chart.</div>'}
+            </div></div></div>
+            <div class="col-md-6"><div class="card jc-card h-100"><div class="card-body">
+              <h6 class="text-muted">Internships vs Jobs</h6>
+              ${d.total ? '<canvas id="typeChart" height="200"></canvas>' : '<div class="text-muted py-4">Nothing to show yet.</div>'}
+            </div></div></div>
+          </div>
+          <div class="row g-3">
+            <div class="col-lg-4"><div class="card jc-card h-100"><div class="card-header bg-white fw-semibold">Deadlines (next 7 days)</div>
+              ${list(d.upcomingDeadlines, (i) => '<strong>' + esc(i.company) + '</strong> - ' + esc(i.title) + '<br><small class="text-muted">Due ' + esc(i.due_date) + '</small>', 'No deadlines this week.')}
+            </div></div>
+            <div class="col-lg-4"><div class="card jc-card h-100"><div class="card-header bg-white fw-semibold">Follow-ups due</div>
+              ${list(d.dueFollowUps, (i) => '<strong>' + esc(i.company) + '</strong> via ' + esc(i.method) + '<br><small class="text-muted">' + esc(i.follow_up_date) + '</small>', 'No follow-ups due.')}
+            </div></div>
+            <div class="col-lg-4"><div class="card jc-card h-100"><div class="card-header bg-white fw-semibold">Upcoming interviews</div>
+              ${list(d.upcomingInterviews, (i) => '<strong>' + esc(i.company) + '</strong> - ' + esc(i.round_name) + '<br><small class="text-muted">' + esc(fmtDateTime(i.interview_date)) + ' (' + esc(i.mode) + ')</small>', 'No interviews scheduled.')}
+            </div></div>
+          </div>`;
+
+        if (d.total) {
+          const colors = { Applied: '#2563eb', Interview: '#06b6d4', Selected: '#16a34a', Rejected: '#dc2626' };
+          new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+              labels: d.byStatus.map((x) => x.status),
+              datasets: [{ data: d.byStatus.map((x) => x.count), backgroundColor: d.byStatus.map((x) => colors[x.status] || '#6b7280') }],
+            },
+          });
+          new Chart(document.getElementById('typeChart'), {
+            type: 'bar',
+            data: {
+              labels: d.byType.map((x) => x.type),
+              datasets: [{ label: 'Applications', data: d.byType.map((x) => x.count), backgroundColor: '#1d4ed8' }],
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+          });
+        }
+      } catch (err) {
+        root.innerHTML = '<div class="alert alert-danger">Could not load dashboard: ' + esc(err.message) + '</div>';
+      }
+    }
+    if (requireAuth()) { renderNav('dashboard'); loadDashboard(); }
+  </script>
+</body>
+</html>
