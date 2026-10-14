@@ -6,6 +6,24 @@
 //   orderBy  - column to sort the list by
 const db = require('../config/db');
 
+const ENUMS = {
+  method: ['Email', 'Call', 'LinkedIn', 'Other'],
+  mode: ['Online', 'Offline'],
+  result: ['Pending', 'Cleared', 'Rejected'],
+};
+const DATE_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/;
+
+// Returns an error message, or null if the sent fields are valid
+function validate(body, cols, required) {
+  for (const c of cols) {
+    const v = body[c];
+    if (required.includes(c) && (v === null || v === '')) return `${c} is required.`;
+    if (ENUMS[c] && !ENUMS[c].includes(v)) return `Invalid ${c}.`;
+    if (c.endsWith('_date') && v !== null && !DATE_RE.test(v)) return `Invalid ${c}.`;
+  }
+  return null;
+}
+
 module.exports = function makeController({ table, fields, required, orderBy }) {
   // Ownership check: does this application belong to the logged-in user?
   const ownsApplication = async (applicationId, userId) => {
@@ -40,7 +58,11 @@ module.exports = function makeController({ table, fields, required, orderBy }) {
       if (!(await ownsApplication(application_id, req.user.id)))
         return res.status(404).json({ message: 'Application not found.' });
 
-      const cols = ['application_id', ...fields.filter((f) => req.body[f] !== undefined)];
+      const sent = fields.filter((f) => req.body[f] !== undefined);
+      const bad = validate(req.body, sent, required);
+      if (bad) return res.status(400).json({ message: bad });
+
+      const cols = ['application_id', ...sent];
       const values = cols.map((c) => req.body[c]);
       const [result] = await db.query(
         `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
@@ -53,6 +75,8 @@ module.exports = function makeController({ table, fields, required, orderBy }) {
     update: async (req, res) => {
       const cols = fields.filter((f) => req.body[f] !== undefined);
       if (!cols.length) return res.status(400).json({ message: 'Nothing to update.' });
+      const bad = validate(req.body, cols, required);
+      if (bad) return res.status(400).json({ message: bad });
 
       const [result] = await db.query(
         `UPDATE ${table} t JOIN applications a ON t.application_id = a.id

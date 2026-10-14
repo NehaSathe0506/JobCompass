@@ -10,15 +10,16 @@ const makeToken = (user) =>
 // POST /api/auth/register
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, college } = req.body;
+    const { name, password, college } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
 
     // Server-side validation
     if (!name || !email || !password)
       return res.status(400).json({ message: 'Name, email and password are required.' });
     if (!/^\S+@\S+\.\S+$/.test(email))
       return res.status(400).json({ message: 'Enter a valid email.' });
-    if (password.length < 6)
-      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    if (password.length < 8)
+  return res.status(400).json({ message: 'Password must be at least 8 characters.' });
 
     const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length) return res.status(409).json({ message: 'Email already registered.' });
@@ -41,7 +42,8 @@ exports.register = async (req, res) => {
 // POST /api/auth/login
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
     if (!email || !password)
       return res.status(400).json({ message: 'Email and password are required.' });
 

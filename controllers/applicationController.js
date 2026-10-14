@@ -4,6 +4,13 @@ const db = require('../config/db');
 const STATUSES = ['Applied', 'Interview', 'Selected', 'Rejected'];
 const TYPES = ['Internship', 'Job'];
 
+// Returns an error message for bad optional fields, or null if fine
+const badFields = ({ job_link, applied_date }) => {
+  if (job_link && !/^https?:\/\//i.test(job_link)) return 'Job link must start with http:// or https://';
+  if (applied_date && !/^\d{4}-\d{2}-\d{2}$/.test(applied_date)) return 'Invalid applied date.';
+  return null;
+};
+
 // Does this company belong to the logged-in user?
 const ownsCompany = async (companyId, userId) => {
   const [rows] = await db.query('SELECT id FROM companies WHERE id = ? AND user_id = ?', [
@@ -53,6 +60,8 @@ exports.create = async (req, res) => {
   if (!company_id || !role) return res.status(400).json({ message: 'Company and role are required.' });
   if (type && !TYPES.includes(type)) return res.status(400).json({ message: 'Invalid type.' });
   if (status && !STATUSES.includes(status)) return res.status(400).json({ message: 'Invalid status.' });
+  const bad = badFields(req.body);
+  if (bad) return res.status(400).json({ message: bad });
   if (!(await ownsCompany(company_id, req.user.id)))
     return res.status(404).json({ message: 'Company not found.' });
 
@@ -70,6 +79,8 @@ exports.update = async (req, res) => {
   if (!company_id || !role) return res.status(400).json({ message: 'Company and role are required.' });
   if (type && !TYPES.includes(type)) return res.status(400).json({ message: 'Invalid type.' });
   if (status && !STATUSES.includes(status)) return res.status(400).json({ message: 'Invalid status.' });
+  const bad = badFields(req.body);
+  if (bad) return res.status(400).json({ message: bad });
   if (!(await ownsCompany(company_id, req.user.id)))
     return res.status(404).json({ message: 'Company not found.' });
 
