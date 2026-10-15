@@ -1,5 +1,6 @@
 -- JobCompass database schema (6 tables)
 -- WARNING: this drops and recreates the jobcompass database (fresh start).
+-- Already have data? Do NOT run this file. Use database/migrations/ instead.
 DROP DATABASE IF EXISTS jobcompass;
 CREATE DATABASE jobcompass;
 USE jobcompass;
@@ -40,8 +41,11 @@ CREATE TABLE applications (
   job_link VARCHAR(255),
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+  -- list/filter by user and status; dashboard GROUP BY status
+  INDEX idx_applications_user_status (user_id, status)
 );
 
 -- Deadline tracking (part of Application Module)
@@ -51,7 +55,8 @@ CREATE TABLE deadlines (
   title VARCHAR(150) NOT NULL,
   due_date DATE NOT NULL,
   is_done BOOLEAN DEFAULT FALSE,
-  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+  INDEX idx_deadlines_due (due_date)
 );
 
 -- Follow-up tracking (Interview Module)
@@ -62,7 +67,8 @@ CREATE TABLE follow_ups (
   method ENUM('Email','Call','LinkedIn','Other') DEFAULT 'Email',
   note TEXT,
   is_done BOOLEAN DEFAULT FALSE,
-  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+  INDEX idx_followups_date (follow_up_date)
 );
 
 -- Interview schedule + result (Interview Module)
@@ -73,5 +79,6 @@ CREATE TABLE interviews (
   interview_date DATETIME NOT NULL,
   mode ENUM('Online','Offline') DEFAULT 'Online',
   result ENUM('Pending','Cleared','Rejected') DEFAULT 'Pending',
-  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+  FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+  INDEX idx_interviews_date (interview_date)
 );
